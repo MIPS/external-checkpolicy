@@ -1,3 +1,34 @@
+2.1.8 2011-12-21
+	* add new helper to translate class sets into bitmaps
+
+2.1.7 2011-12-05
+	* dis* fixed signed vs unsigned errors
+	* dismod: fix unused parameter errors
+	* test: Makefile: include -W and -Werror
+	* allow ~ in filename transition rules
+
+2.1.6 2011-11-03
+	* Revert "checkpolicy: Redo filename/filesystem syntax to support filename trans rules"
+	* drop libsepol dynamic link in checkpolicy
+
+2.1.5 2011-09-15
+	* Separate tunable from boolean during compile.
+
+2.1.4 2011-08-26
+	* checkpolicy: fix spacing in output message
+
+2.1.3 2011-08-17
+	* add missing ; to attribute_role_def
+	*Redo filename/filesystem syntax to support filename trans
+
+2.1.2 2011-08-02
+	* .gitignore changes
+	* dispol output of role trans
+	* man page update: build a module with an older policy version
+
+2.1.1 2011-08-01
+	* Minor updates to filename trans rule output in dis{mod,pol}
+
 2.1.0 2011-07-27
 	* Release, minor version bump
 

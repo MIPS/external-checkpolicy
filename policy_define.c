@@ -327,6 +327,30 @@ int define_initial_sid(void)
 	return -1;
 }
 
+static int read_classes(ebitmap_t *e_classes)
+{
+	char *id;
+	class_datum_t *cladatum;
+
+	while ((id = queue_remove(id_queue))) {
+		if (!is_id_in_scope(SYM_CLASSES, id)) {
+			yyerror2("class %s is not within scope", id);
+			return -1;
+		}
+		cladatum = hashtab_search(policydbp->p_classes.table, id);
+		if (!cladatum) {
+			yyerror2("unknown class %s", id);
+			return -1;
+		}
+		if (ebitmap_set_bit(e_classes, cladatum->s.value - 1, TRUE)) {
+			yyerror("Out of memory");
+			return -1;
+		}
+		free(id);
+	}
+	return 0;
+}
+
 int define_common_perms(void)
 {
 	char *id = 0, *perm = 0;
@@ -1360,7 +1384,6 @@ int define_compute_type_helper(int which, avrule_t ** rule)
 {
 	char *id;
 	type_datum_t *datum;
-	class_datum_t *cladatum;
 	ebitmap_t tclasses;
 	ebitmap_node_t *node;
 	avrule_t *avrule;
@@ -1387,23 +1410,8 @@ int define_compute_type_helper(int which, avrule_t ** rule)
 	}
 
 	ebitmap_init(&tclasses);
-	while ((id = queue_remove(id_queue))) {
-		if (!is_id_in_scope(SYM_CLASSES, id)) {
-			yyerror2("class %s is not within scope", id);
-			free(id);
-			goto bad;
-		}
-		cladatum = hashtab_search(policydbp->p_classes.table, id);
-		if (!cladatum) {
-			yyerror2("unknown class %s", id);
-			goto bad;
-		}
-		if (ebitmap_set_bit(&tclasses, cladatum->s.value - 1, TRUE)) {
-			yyerror("Out of memory");
-			goto bad;
-		}
-		free(id);
-	}
+	if (read_classes(&tclasses))
+		goto bad;
 
 	id = (char *)queue_remove(id_queue);
 	if (!id) {
@@ -1494,7 +1502,7 @@ avrule_t *define_cond_compute_type(int which)
 	return avrule;
 }
 
-int define_bool(void)
+int define_bool_tunable(int is_tunable)
 {
 	char *id, *bool_value;
 	cond_bool_datum_t *datum;
@@ -1524,6 +1532,8 @@ int define_bool(void)
 		return -1;
 	}
 	memset(datum, 0, sizeof(cond_bool_datum_t));
+	if (is_tunable)
+		datum->flags |= COND_BOOL_FLAGS_TUNABLE;
 	ret = declare_symbol(SYM_BOOLS, id, datum, &value, &value);
 	switch (ret) {
 	case -3:{
@@ -1626,25 +1636,9 @@ int define_te_avtab_helper(int which, avrule_t ** rule)
 	}
 
 	ebitmap_init(&tclasses);
-	while ((id = queue_remove(id_queue))) {
-		if (!is_id_in_scope(SYM_CLASSES, id)) {
-			yyerror2("class %s is not within scope", id);
-			ret = -1;
-			goto out;
-		}
-		cladatum = hashtab_search(policydbp->p_classes.table, id);
-		if (!cladatum) {
-			yyerror2("unknown class %s used in rule", id);
-			ret = -1;
-			goto out;
-		}
-		if (ebitmap_set_bit(&tclasses, cladatum->s.value - 1, TRUE)) {
-			yyerror("Out of memory");
-			ret = -1;
-			goto out;
-		}
-		free(id);
-	}
+	ret = read_classes(&tclasses);
+	if (ret)
+		goto out;
 
 	perms = NULL;
 	ebitmap_for_each_bit(&tclasses, node, i) {
@@ -2240,22 +2234,8 @@ int define_role_trans(int class_specified)
 	}
 
 	if (class_specified) {
-		while ((id = queue_remove(id_queue))) {
-			if (!is_id_in_scope(SYM_CLASSES, id)) {
-				yyerror2("class %s is not within scope", id);
-				free(id);
-				return -1;
-			}
-			cladatum = hashtab_search(policydbp->p_classes.table,
-						  id);
-			if (!cladatum) {
-				yyerror2("unknow class %s", id);
-				return -1;
-			}
-
-			ebitmap_set_bit(&e_classes, cladatum->s.value - 1, TRUE);
-			free(id);
-		}
+		if (read_classes(&e_classes))
+			return -1;
 	} else {
 		cladatum = hashtab_search(policydbp->p_classes.table,
 					  "process");
@@ -2408,7 +2388,6 @@ int define_filename_trans(void)
 	ebitmap_node_t *snode, *tnode, *cnode;
 	filename_trans_t *ft;
 	filename_trans_rule_t *ftr;
-	class_datum_t *cladatum;
 	type_datum_t *typdatum;
 	uint32_t otype;
 	unsigned int c, s, t;
@@ -2449,23 +2428,8 @@ int define_filename_trans(void)
 	}
 
 	ebitmap_init(&e_tclasses);
-	while ((id = queue_remove(id_queue))) {
-		if (!is_id_in_scope(SYM_CLASSES, id)) {
-			yyerror2("class %s is not within scope", id);
-			free(id);
-			goto bad;
-		}
-		cladatum = hashtab_search(policydbp->p_classes.table, id);
-		if (!cladatum) {
-			yyerror2("unknown class %s", id);
-			goto bad;
-		}
-		if (ebitmap_set_bit(&e_tclasses, cladatum->s.value - 1, TRUE)) {
-			yyerror("Out of memory");
-			goto bad;
-		}
-		free(id);
-	}
+	if (read_classes(&e_tclasses))
+		goto bad;
 
 	id = (char *)queue_remove(id_queue);
 	if (!id) {
@@ -4547,23 +4511,8 @@ int define_range_trans(int class_specified)
 	}
 
 	if (class_specified) {
-		while ((id = queue_remove(id_queue))) {
-			if (!is_id_in_scope(SYM_CLASSES, id)) {
-				yyerror2("class %s is not within scope", id);
-				free(id);
-				goto out;
-			}
-			cladatum = hashtab_search(policydbp->p_classes.table,
-			                          id);
-			if (!cladatum) {
-				yyerror2("unknown class %s", id);
-				goto out;
-			}
-
-			ebitmap_set_bit(&rule->tclasses, cladatum->s.value - 1,
-			                TRUE);
-			free(id);
-		}
+		if (read_classes(&rule->tclasses))
+			goto out;
 	} else {
 		cladatum = hashtab_search(policydbp->p_classes.table,
 		                          "process");
