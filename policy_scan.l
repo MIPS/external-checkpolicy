@@ -96,6 +96,8 @@ TYPE |
 type				{ return(TYPE); }
 BOOL |
 bool                            { return(BOOL); }
+TUNABLE |
+tunable				{ return(TUNABLE); }
 IF |
 if				{ return(IF); }
 ELSE |
@@ -224,7 +226,7 @@ POLICYCAP			{ return(POLICYCAP); }
 permissive |
 PERMISSIVE			{ return(PERMISSIVE); }
 "/"({alnum}|[_\.\-/])*	        { return(PATH); }
-\"({alnum}|[_\.\-])+\"			{ return(FILENAME); }
+\"({alnum}|[_\.\-\~])+\"	{ return(FILENAME); }
 {letter}({alnum}|[_\-])*([\.]?({alnum}|[_\-]))*	{ return(IDENTIFIER); }
 {alnum}*{letter}{alnum}*        { return(FILESYSTEM); }
 {digit}+|0x{hexval}+            { return(NUMBER); }
