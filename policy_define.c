@@ -1497,12 +1497,12 @@ int define_compute_type_helper(int which, avrule_t ** rule)
 
 	while ((id = queue_remove(id_queue))) {
 		if (set_types(&avrule->stypes, id, &add, 0))
-			return -1;
+			goto bad;
 	}
 	add = 1;
 	while ((id = queue_remove(id_queue))) {
 		if (set_types(&avrule->ttypes, id, &add, 0))
-			return -1;
+			goto bad;
 	}
 
 	ebitmap_init(&tclasses);
@@ -1531,7 +1531,7 @@ int define_compute_type_helper(int which, avrule_t ** rule)
 			perm = malloc(sizeof(class_perm_node_t));
 			if (!perm) {
 				yyerror("out of memory");
-				return -1;
+				goto bad;
 			}
 			class_perm_node_init(perm);
 			perm->class = i + 1;
@@ -2050,10 +2050,12 @@ role_datum_t *merge_roles_dom(role_datum_t * r1, role_datum_t * r2)
 	new->s.value = 0;		/* temporary role */
 	if (ebitmap_or(&new->dominates, &r1->dominates, &r2->dominates)) {
 		yyerror("out of memory");
+		free(new);
 		return NULL;
 	}
 	if (ebitmap_or(&new->types.types, &r1->types.types, &r2->types.types)) {
 		yyerror("out of memory");
+		free(new);
 		return NULL;
 	}
 	if (!r1->s.value) {
@@ -2458,13 +2460,17 @@ int define_role_allow(void)
 	role_allow_rule_init(ra);
 
 	while ((id = queue_remove(id_queue))) {
-		if (set_roles(&ra->roles, id))
+		if (set_roles(&ra->roles, id)) {
+			free(ra);
 			return -1;
+		}
 	}
 
 	while ((id = queue_remove(id_queue))) {
-		if (set_roles(&ra->new_roles, id))
+		if (set_roles(&ra->new_roles, id)) {
+			free(ra);
 			return -1;
+		}
 	}
 
 	append_role_allow(ra);
@@ -2777,6 +2783,7 @@ int define_constraint(constraint_expr_t * expr)
 		}
 		if (!node->expr) {
 			yyerror("out of memory");
+			free(node);
 			return -1;
 		}
 		node->permissions = 0;
@@ -3281,6 +3288,7 @@ cond_expr_t *define_cond_expr(uint32_t expr_type, void *arg1, void *arg2)
 		return expr;
 	default:
 		yyerror("illegal conditional expression");
+		free(expr);
 		return NULL;
 	}
 }
@@ -3580,6 +3588,12 @@ static int parse_security_context(context_struct_t * c)
 			}
 		}
 		return 0;
+	}
+
+	/* check context c to make sure ok to dereference c later */
+	if (c == NULL) {
+		yyerror("null context pointer!");
+		return -1;
 	}
 
 	context_init(c);
@@ -4673,6 +4687,7 @@ int define_range_trans(int class_specified)
 
 out:
 	range_trans_rule_destroy(rule);
+	free(rule);
 	return -1;
 }
 
